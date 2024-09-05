@@ -5,6 +5,44 @@ let chatHistory = [];
 let clicked = [];
 let timeoutId; 
 
+let startTime;
+let questionsSent = 0;
+let musicConverted = 0;
+
+let userInputCount = 0;
+
+// Track the start time
+$(document).ready(function() {
+    startTime = new Date();
+});
+
+
+// Track the number of music conversions
+document.getElementById('convert-btn').addEventListener('click', function() {
+    musicConverted++;
+});
+
+// Function to calculate session duration
+function calculateSessionDuration() {
+    const endTime = new Date();
+    const duration = Math.floor((endTime - startTime) / 1000); // Duration in seconds
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${minutes} minutes and ${seconds} seconds`;
+}
+
+// Display session summary in the modal
+function displaySessionSummary() {
+    document.getElementById('session-duration').innerText = calculateSessionDuration();
+    document.getElementById('questions-sent').innerText = questionsSent;
+    document.getElementById('clicks-count').innerText = clicked.length;
+    document.getElementById('music-converted').innerText = musicConverted;
+    $('#endSessionModal').modal('show');
+}
+
+// Trigger the end session modal
+document.getElementById('download-btn').addEventListener('click', displaySessionSummary);
+
 
 $(document).ready(function() {
     // Show the modal on page load
@@ -29,6 +67,10 @@ $(document).ready(function() {
         csvContent += `Name,${userInfo.name}\n`;
         csvContent += `Level,${userInfo.level}\n`;
         csvContent += `Login Time,${userInfo.loginTime}\n\n`;
+        csvContent += `Session Duration,${calculateSessionDuration()}\n`;
+        csvContent += `Questions Sent,${questionsSent}\n`;
+        csvContent += `Clicks on Music Sheet,${clicked.length}\n\n`;
+
         csvContent += "Sender,Message\n";
         chatHistory.forEach(function(row) {
             csvContent += `${row.sender},${row.message}\n`;
@@ -80,9 +122,21 @@ window.onbeforeunload = function(e) {
 //     document.getElementById('modify-button').classList.add('active');
 // });
 
+// Function to handle user input
+function handleUserInput() {
+    userInputCount++;
+    if (userInputCount % (Math.floor(Math.random() * 3) + 3) === 0) {
+        setTimeout(showGreeting, 10000); // 10-second delay
+        userInputCount++;
+    }
+}
+
+// Show greeting message
+// Show greeting message
 function showGreeting() {
     const responseOutput = document.getElementById('response-output');
-    var fullMessage = `[Role] You are a helpful music education assistant that will support begineer student in learning music.\n[Requirement] You are required to generate one short encouragement message ONLY which encourage the begineer student to learn music, such as "Music is fun, isn't is" and "Enjoy yourself in the playground of musical notes and rhythms. You must output motivating sentence and avoid any extra output. You must ensure a diversity of output, be creative!\n[Output Format] <one sentence of encouragement ONLY, no extra output>`;
+    const fullMessage = `[Role] You are a helpful music education assistant that will support beginner students in learning music.\n[Requirement] You are required to generate one short encouragement message ONLY which encourages the beginner student to learn music, such as "Music is fun, isn't it?" and "Enjoy yourself in the playground of musical notes and rhythms." You must output a motivating sentence and avoid any extra output. You must ensure a diversity of output, be creative!\n[Output Format] <one sentence of encouragement ONLY, no extra output>`;
+    
     $.ajax({
         url: 'https://api.xty.app/v1/chat/completions',
         type: 'POST',
@@ -100,23 +154,13 @@ function showGreeting() {
             const content = response.choices[0].message.content;
             chatHistory.push({ sender: 'LLM', message: content });
             const responseMessage = document.createElement('div');
-            responseMessage.className = 'alert alert-primary';
+            responseMessage.className = 'alert alert-success';
             responseMessage.innerText = content;
             responseOutput.appendChild(responseMessage);
             responseOutput.scrollTop = responseOutput.scrollHeight;
         }
     });
-    resetTimer();
 }
-
-function resetTimer() {
-    clearTimeout(timeoutId);
-    const delay = Math.floor(Math.random() * 10000) + 300000; // Random delay between 30,000ms (30s) and 40,000ms (40s)
-    timeoutId = setTimeout(showGreeting, delay);
-}
-
-// Start the initial timer
-resetTimer();
 
 document.getElementById('save-api-key').addEventListener('click', () => {
     apiKey = document.getElementById('api-key-input').value.trim();
@@ -141,7 +185,21 @@ document.getElementById('convert-btn').addEventListener('click', () => {
             const svg = document.querySelector("#music-sheet svg");
             if (svg) {
                 svg.setAttribute('id', 'music-sheet-svg');
-            }
+                svgPanZoom(svg, {
+                    panEnabled: true
+                    , controlIconsEnabled: false
+                    , zoomEnabled: true
+                    , dblClickZoomEnabled: false
+                    , mouseWheelZoomEnabled: true
+                    , preventMouseEventsDefault: true
+                    , zoomScaleSensitivity: 0.2
+                    , minZoom: 0.5
+                    , maxZoom: 10
+                    , fit: true
+                    , contain: false
+                    , center: true
+                    });
+                }
             // Add click event listener to each note
             const notes = svg.querySelectorAll('.abcjs-notehead');
             // notes.forEach(note => {
@@ -179,7 +237,7 @@ document.getElementById('convert-btn').addEventListener('click', () => {
             // });
             const blobk = svg.querySelectorAll('g[data-name="note"]');
             blobk.forEach(noteGroup => {
-                noteGroup.addEventListener('click', async function() {
+                noteGroup.addEventListener('click', async function(e) {
                     const noteHead = noteGroup.querySelector('.abcjs-notehead');
                     const noteName = noteGroup.querySelector('.abcjs-notehead').getAttribute('data-name');
                     const keyCode = getKeyFromName(noteName);
@@ -189,18 +247,24 @@ document.getElementById('convert-btn').addEventListener('click', () => {
                         audio.play();
                     }
                     // Get note position
-                    const noteBBox = noteHead.getBBox();
-                    const noteX = noteBBox.x + noteBBox.width / 2; // Center of the note
-                    const noteY = noteBBox.y;
+                    // const noteBBox = noteHead.getBBox();
+                    // const noteX = noteBBox.x + noteBBox.width / 2; // Center of the note
+                    // const noteY = noteBBox.y;
+
+                    const noteX = e.clientX;
+                    const noteY = e.clientY;
+
+                    alert(`${noteX}px`)
 
                     // Create text element to display note name
                     const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    textElement.setAttribute('x', noteX);
-                    textElement.setAttribute('y', noteY - 10); // Position above the note
+                    textElement.setAttribute('x', `${noteX-45}px`);
+                    textElement.setAttribute('y', `${noteY-275}px`); // Position above the note
                     textElement.setAttribute('text-anchor', 'middle'); // Center the text
                     textElement.setAttribute('fill', 'red'); // Make text color red for visibility
                     textElement.setAttribute('font-size', '20px'); // Increase font size for visibility
                     textElement.setAttribute('font-weight', 'bold'); // Make text bold
+                    textElement.setAttribute('position', 'absolute'); // Make text bold
                     textElement.textContent = keyCode.slice(0, -1);
 
                     // Append text element to the SVG
@@ -282,10 +346,11 @@ function sendMessage() {
     const responseOutput = document.getElementById('response-output');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
+    questionsSent++;
     chatHistory.push({ sender: 'User', message: userInput });
 
     if (userInput !== "") {
-        resetTimer();
+        handleUserInput();
         loadingSpinner.classList.remove('hidden');
         const userMessage = document.createElement('div');
         userMessage.className = 'alert alert-secondary';
