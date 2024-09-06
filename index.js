@@ -254,7 +254,6 @@ document.getElementById('convert-btn').addEventListener('click', () => {
                     const noteX = e.clientX;
                     const noteY = e.clientY;
 
-                    alert(`${noteX}px`)
 
                     // Create text element to display note name
                     const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
