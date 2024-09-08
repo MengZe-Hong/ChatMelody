@@ -3,6 +3,7 @@ let selectedMode = 'chat';
 let userInfo = {};
 let chatHistory = [];
 let clicked = [];
+let eyeTracker = [];
 let timeoutId; 
 
 let startTime;
@@ -10,6 +11,30 @@ let questionsSent = 0;
 let musicConverted = 0;
 
 let userInputCount = 0;
+
+// Function to remove the video container
+function removeVideoContainer() {
+    const videoContainer = document.getElementById('webgazerVideoContainer');
+    if (videoContainer) {
+        videoContainer.remove();
+    }
+}
+
+webgazer.setGazeListener(function(data, elapsedTime) {
+    if (data == null) {
+        return;
+    }
+
+    var xprediction = data.x; // these x coordinates are relative to the viewport
+    var yprediction = data.y; // these y coordinates are relative to the viewport
+    eyeTracker.push({ index: eyeTracker.length, coordinates: `${xprediction}, ${yprediction}` });
+
+    setTimeout(() => {
+        canOutputData = true;
+    }, 1000);
+}).begin();
+
+
 
 // Track the start time
 $(document).ready(function() {
@@ -56,6 +81,10 @@ $(document).ready(function() {
 
         apiKey = document.getElementById('api-key-input').value.trim();
 
+        
+        // Remove the video container before starting the gaze listener
+        removeVideoContainer();
+
         // Close the modal
         $('#loginModal').modal('hide');
     });
@@ -63,35 +92,57 @@ $(document).ready(function() {
 
     // Handle CSV download
     $('#download-btn').on('click', function() {
-        let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += `Name,${userInfo.name}\n`;
-        csvContent += `Level,${userInfo.level}\n`;
-        csvContent += `Login Time,${userInfo.loginTime}\n\n`;
-        csvContent += `Session Duration,${calculateSessionDuration()}\n`;
-        csvContent += `Questions Sent,${questionsSent}\n`;
-        csvContent += `Clicks on Music Sheet,${clicked.length}\n\n`;
+        // User and session information CSV
+        let userInfoCsv = "data:text/csv;charset=utf-8,";
+        userInfoCsv += `Name,${userInfo.name}\n`;
+        userInfoCsv += `Level,${userInfo.level}\n`;
+        userInfoCsv += `Login Time,${userInfo.loginTime}\n\n`;
+        userInfoCsv += `Session Duration,${calculateSessionDuration()}\n`;
+        userInfoCsv += `Questions Sent,${questionsSent}\n`;
+        userInfoCsv += `Clicks on Music Sheet,${clicked.length}\n`;
 
-        csvContent += "Sender,Message\n";
+        // Chat history CSV
+        let chatHistoryCsv = "data:text/csv;charset=utf-8,";
+        chatHistoryCsv += "Sender,Message\n";
         chatHistory.forEach(function(row) {
-            csvContent += `${row.sender},${row.message}\n`;
+            chatHistoryCsv += `${row.sender},${row.message}\n`;
         });
 
-        csvContent += `\n`
+        let clickedHistoryCsv = "data:text/csv;charset=utf-8,";
 
-        csvContent += "index,position,note\n";
+        // Clicked positions CSV
+        clickedHistoryCsv += "Index,Position,Note\n";
         clicked.forEach(function(row) {
-            csvContent += `${row.index},${row.position},${row.note}\n`;
+            clickedHistoryCsv += `${row.index},${row.position},${row.note}\n`;
         });
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${userInfo.name}_${userInfo.loginTime}.csv`);
-        document.body.appendChild(link);    
-        link.click();
-        document.body.removeChild(link);
+        let eyeHistoryCsv = "data:text/csv;charset=utf-8,";
+
+        // Clicked positions CSV
+        eyeHistoryCsv += "Index,Position\n";
+        eyeTracker.forEach(function(row) {
+            eyeHistoryCsv += `${row.index},${row.coordinates}\n`;
+        });
+
+
+        // Download the CSV files
+        downloadCsv(userInfoCsv, `${userInfo.name}_session_info.csv`);
+        downloadCsv(chatHistoryCsv, `${userInfo.name}_chat_history.csv`);
+        downloadCsv(clickedHistoryCsv, `${userInfo.name}_click_history.csv`);
+        downloadCsv(eyeHistoryCsv, `${userInfo.name}_eye_history.csv`);
     });
 });
+
+// Function to download CSV
+function downloadCsv(content, filename) {
+    const encodedUri = encodeURI(content);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 
 // Automatically trigger close and download on page unload
 // window.addEventListener('beforeunload', function() {
